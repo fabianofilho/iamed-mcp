@@ -1,0 +1,54 @@
+[project]
+name = "iamed-mcp"
+version = "0.1.0"
+description = "Servidor MCP somente leitura com o conteúdo publicado mais recente do IA.med sobre IA na medicina"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+dependencies = [
+    # O servidor importa mcp.server.mcpserver, que só existe a partir da 2.2.
+    "mcp>=2.2,<3",
+    "httpx>=0.28",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "uvicorn>=0.30",
+]
+
+[project.urls]
+Repository = "https://github.com/fabianofilho/iamed-mcp"
+
+[project.scripts]
+iamed-mcp = "iamed_mcp.mcp_server.server:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "respx>=0.22",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/iamed_mcp"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src"]
