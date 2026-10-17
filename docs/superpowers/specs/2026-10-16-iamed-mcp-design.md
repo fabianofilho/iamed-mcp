@@ -339,3 +339,36 @@ Depois do spec aprovado e do servidor testado local:
 
 Estrutura interna dos módulos, nomes de funções, lista exata de palavras
 vazias e do domínio, mensagens de erro, formato do README e do CHANGELOG.
+
+## 12. Decisões tomadas na implementação
+
+O que diverge do texto aprovado ou o completa, com o custo se estiver errado.
+
+- **Espera de 30 s depois de carga com falha** (parcial ou total). Substitui
+  "carga parcial não entra no cache" da seção 6: o parcial é servido, mas a
+  próxima tentativa só sai depois de 30 s. Sem isso, cada chamada ao endpoint
+  público disparava cinco consultas ao Supabase enquanto ele falhava, contra a
+  seção 7.4. Custo: na falha parcial, o tipo que faltou some por até 30 s.
+- **Título até 300 caracteres e cada tag até 100.** O spec não fixava; sem
+  isso o teto de resposta não fecha.
+- **Teto de 100 KB em bytes, nas duas cópias que o SDK manda**
+  (`structured_content` e o mesmo JSON indentado num TextContent). Se uma
+  página passar, os últimos itens saem, `tem_mais` fica true e o `aviso` diz
+  que a resposta foi cortada. Medido na rede com 50 itens reais: 93.948 bytes.
+- **Corpo de requisição até 64 KB** (413 acima, com ou sem content-length) e
+  `tipos` com no máximo 7 itens: o limitador conta requisições, não bytes.
+- **Especialidades reconhecidas** são as que têm pelo menos um item com nota
+  >= 0,7 (as únicas linhas lidas). Endocrinologia, Genética e Ortopedia
+  aparecem como "não reconhecida", com a lista das conhecidas no aviso.
+- **Aviso de base desatualizada** quando a última leitura boa tem mais de 10
+  minutos (dois ciclos de cache), para não avisar à toa no ciclo normal.
+- **Origem no log** por contextvar no middleware HTTP (`origem=a.b.c.0`); em
+  stdio, `origem=local`.
+- **Unit systemd** sem `EnvironmentFile=` (no systemd ele vence
+  `Environment=` e um `.env` copiado do exemplo derrubava o modo conector), com
+  `ExecStart` no binário do `.venv` (a home é só leitura) e `MemoryMax=512M`,
+  `CPUQuota=50%`, `TasksMax=64`.
+
+A conferir no deploy: se o Funnel manda `X-Forwarded-For` com o IP real (se
+não mandar, o teto por origem vale 60/min para todos) e se `ProtectSystem` e
+`PrivateTmp` funcionam em unit de usuário no Debian.
