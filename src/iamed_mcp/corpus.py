@@ -97,8 +97,11 @@ class _Bruto:
 
 def _de_artigo(linha: dict[str, Any]) -> _Bruto:
     return _Bruto(
-        id=_texto(linha.get("id")), tipo="artigo", titulo=_texto(linha.get("title")),
-        resumo=_texto(linha.get("summary")), tags=_tags(linha.get("tags")),
+        id=_texto(linha.get("id")),
+        tipo="artigo",
+        titulo=_texto(linha.get("title")),
+        resumo=_texto(linha.get("summary")),
+        tags=_tags(linha.get("tags")),
         data=_data(linha.get("published_at")),
     )
 
@@ -117,26 +120,39 @@ def _de_notion(linha: dict[str, Any]) -> _Bruto | None:
     elif modulo:
         organizador = modulo
     return _Bruto(
-        id=_texto(linha.get("id")), tipo=tipo, titulo=_texto(linha.get("titulo")),
-        resumo=_texto(linha.get("resumo")), tags=tags,
-        data=_data(linha.get("data_publicacao")), escopo=_escopo(linha.get("escopo")),
-        organizador=organizador, fonte=link_seguro(linha.get("url_midia")),
+        id=_texto(linha.get("id")),
+        tipo=tipo,
+        titulo=_texto(linha.get("titulo")),
+        resumo=_texto(linha.get("resumo")),
+        tags=tags,
+        data=_data(linha.get("data_publicacao")),
+        escopo=_escopo(linha.get("escopo")),
+        organizador=organizador,
+        fonte=link_seguro(linha.get("url_midia")),
     )
 
 
 def _de_episodio(linha: dict[str, Any]) -> _Bruto:
     return _Bruto(
-        id=_texto(linha.get("id")), tipo="episodio", titulo=_texto(linha.get("title")),
-        resumo=_texto(linha.get("description")), tags=(),
-        data=_data(linha.get("published_at")), fonte=link_seguro(linha.get("spotify_url")),
+        id=_texto(linha.get("id")),
+        tipo="episodio",
+        titulo=_texto(linha.get("title")),
+        resumo=_texto(linha.get("description")),
+        tags=(),
+        data=_data(linha.get("published_at")),
+        fonte=link_seguro(linha.get("spotify_url")),
     )
 
 
 def _de_aula(linha: dict[str, Any]) -> _Bruto:
     return _Bruto(
-        id=_texto(linha.get("id")), tipo="aula", titulo=_texto(linha.get("title")),
-        resumo=_texto(linha.get("description")), tags=(),
-        data=_data(linha.get("created_at")), organizador=_texto(linha.get("module")) or None,
+        id=_texto(linha.get("id")),
+        tipo="aula",
+        titulo=_texto(linha.get("title")),
+        resumo=_texto(linha.get("description")),
+        tags=(),
+        data=_data(linha.get("created_at")),
+        organizador=_texto(linha.get("module")) or None,
     )
 
 
@@ -170,13 +186,22 @@ def montar_registros(carga: Carga, agora: datetime) -> list[Registro]:
         if bruto.data and bruto.data > agora and bruto.tipo not in _DATA_DE_EVENTO:
             continue
         vistos.add(id_)
-        registros.append(Registro(
-            id=id_, tipo=bruto.tipo, titulo=bruto.titulo, resumo=bruto.resumo, tags=bruto.tags,
-            data=bruto.data, escopo=bruto.escopo, organizador=bruto.organizador,
-            fonte=bruto.fonte, especialidades=tuple(sorted(relevancia.get(id_, ()))),
-            titulo_norm=normalizar(bruto.titulo),
-            texto_norm=normalizar(" ".join([bruto.titulo, bruto.resumo, *bruto.tags])),
-        ))
+        registros.append(
+            Registro(
+                id=id_,
+                tipo=bruto.tipo,
+                titulo=bruto.titulo,
+                resumo=bruto.resumo,
+                tags=bruto.tags,
+                data=bruto.data,
+                escopo=bruto.escopo,
+                organizador=bruto.organizador,
+                fonte=bruto.fonte,
+                especialidades=tuple(sorted(relevancia.get(id_, ()))),
+                titulo_norm=normalizar(bruto.titulo),
+                texto_norm=normalizar(" ".join([bruto.titulo, bruto.resumo, *bruto.tags])),
+            )
+        )
     return registros
 
 
@@ -236,17 +261,23 @@ class CacheCorpus:
                 if self._bom is None:
                     raise BaseIndisponivel("a base do IA.med está indisponível")
                 return Corpus(
-                    registros=self._bom.registros, carregado_em=self._bom.carregado_em,
+                    registros=self._bom.registros,
+                    carregado_em=self._bom.carregado_em,
                     faltando=list(carga.falhas),
                     especialidades_conhecidas=self._bom.especialidades_conhecidas,
                 )
-            conhecidas = sorted({
-                _texto(linha.get("especialidade"))
-                for linha in carga.tabelas.get("content_relevance", [])
-            } - {""})
+            conhecidas = sorted(
+                {
+                    _texto(linha.get("especialidade"))
+                    for linha in carga.tabelas.get("content_relevance", [])
+                }
+                - {""}
+            )
             corpus = Corpus(
-                registros=montar_registros(carga, agora), carregado_em=agora,
-                faltando=list(carga.falhas), especialidades_conhecidas=tuple(conhecidas),
+                registros=montar_registros(carga, agora),
+                carregado_em=agora,
+                faltando=list(carga.falhas),
+                especialidades_conhecidas=tuple(conhecidas),
             )
             if not carga.falhas:
                 self._bom = corpus
