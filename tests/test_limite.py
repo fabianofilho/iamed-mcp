@@ -127,10 +127,69 @@ async def test_middleware_expoe_origem_zerada_para_o_log() -> None:
     async def app(scope: Any, receive: Any, send: Any) -> None:
         vista.append(origem_atual.get())
 
-    async def nada(*_: Any) -> None:
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(*_: Any) -> None:
         return None
 
     protegido = _com_limite(app, limite_por_minuto=60, limite_global=300)
-    await protegido({"type": "http", "client": ("198.51.100.7", 1), "headers": []}, nada, nada)
+    await protegido({"type": "http", "client": ("198.51.100.7", 1), "headers": []}, receive, send)
     assert vista == ["198.51.100.0"]
     assert origem_atual.get() == "local"
+
+
+async def _chamar(protegido: Any, cabecalhos: list[tuple[bytes, bytes]], pedacos: list[bytes]):
+    status: list[int] = []
+    corpo_visto: list[bytes] = []
+    fila = [
+        {"type": "http.request", "body": p, "more_body": i < len(pedacos) - 1}
+        for i, p in enumerate(pedacos)
+    ]
+
+    async def receive() -> dict[str, Any]:
+        return fila.pop(0) if fila else {"type": "http.disconnect"}
+
+    async def send(mensagem: dict[str, Any]) -> None:
+        if mensagem["type"] == "http.response.start":
+            status.append(mensagem["status"])
+
+    scope = {"type": "http", "client": ("198.51.100.7", 1), "headers": cabecalhos}
+    await protegido(scope, receive, send)
+    return status, corpo_visto
+
+
+def _app_que_le(corpo_visto: list[bytes]) -> Any:
+    async def app(scope: Any, receive: Any, send: Any) -> None:
+        partes = b""
+        while True:
+            m = await receive()
+            partes += m.get("body", b"")
+            if not m.get("more_body"):
+                break
+        corpo_visto.append(partes)
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    return app
+
+
+async def test_corpo_grande_com_content_length_recebe_413() -> None:
+    visto: list[bytes] = []
+    protegido = _com_limite(_app_que_le(visto), limite_por_minuto=60, limite_global=300)
+    status, _ = await _chamar(protegido, [(b"content-length", b"70000")], [b"x" * 70_000])
+    assert status == [413] and visto == []
+
+
+async def test_corpo_grande_sem_content_length_recebe_413() -> None:
+    visto: list[bytes] = []
+    protegido = _com_limite(_app_que_le(visto), limite_por_minuto=60, limite_global=300)
+    status, _ = await _chamar(protegido, [], [b"x" * 40_000, b"x" * 40_000])
+    assert status == [413] and visto == []
+
+
+async def test_corpo_pequeno_em_pedacos_chega_inteiro() -> None:
+    visto: list[bytes] = []
+    protegido = _com_limite(_app_que_le(visto), limite_por_minuto=60, limite_global=300)
+    status, _ = await _chamar(protegido, [], [b"ab", b"cd", b"ef"])
+    assert status == [200] and visto == [b"abcdef"]

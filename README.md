@@ -56,9 +56,14 @@ TRANSPORTE=streamable-http HTTP_PORTA=8107 uv run iamed-mcp
 ```
 
 Escuta em `127.0.0.1:8107/mcp`. Em produção roda no debian-f como serviço de
-usuário (`deploy/iamed-connector.service`), atrás do Tailscale Funnel na rota
-`/iamed`. Limites: 300 requisições por minuto no total e 60 por origem; acima
-disso, 429 com `Retry-After: 60`.
+usuário (`deploy/iamed-connector.service`; antes de instalar, `uv sync --frozen
+--no-dev` no checkout, porque o serviço roda o binário do `.venv` sem uv),
+atrás do Tailscale Funnel na rota `/iamed` (URL pública
+`https://debian-f.tailf42a96.ts.net/iamed/mcp`, só depois de publicado).
+Limites: 300 requisições por minuto no total e 60 por origem (acima disso, 429
+com `Retry-After: 60`), corpo de requisição até 64 KB (acima, 413) e resposta
+abaixo de 100 KB. Se o Supabase falhar, o servidor espera 30 s antes de tentar
+ler de novo.
 
 ## Desligar rápido
 

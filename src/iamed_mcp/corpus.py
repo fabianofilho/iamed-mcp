@@ -22,6 +22,8 @@ from iamed_mcp.saida import Tipo, link_seguro, normalizar_id
 
 logger = logging.getLogger(__name__)
 
+ESPERA_APOS_FALHA = 30
+
 _TIPOS_NOTION: dict[str, Tipo] = {
     "news": "news",
     "evento": "evento",
@@ -240,6 +242,12 @@ class CacheCorpus:
         self._relogio = relogio
         self._ttl = timedelta(seconds=config.cache_segundos)
         self._bom: Corpus | None = None
+        # Depois de uma carga com falha, não tenta de novo antes disto: sem a
+        # espera, cada chamada ao endpoint público viraria cinco consultas ao
+        # Supabase justo quando ele está falhando (spec 7.4).
+        self._espera = timedelta(seconds=ESPERA_APOS_FALHA)
+        self._tentar_depois: datetime | None = None
+        self._ultimo: Corpus | None = None
         self._trava = asyncio.Lock()
 
     def _valido(self, agora: datetime) -> bool:
@@ -255,17 +263,24 @@ class CacheCorpus:
             if self._valido(agora):
                 assert self._bom is not None
                 return self._bom
+            if self._tentar_depois is not None and agora < self._tentar_depois:
+                if self._ultimo is None:
+                    raise BaseIndisponivel("a base do IA.med está indisponível")
+                return self._ultimo
             carga = await self._carregar(self._config)
+            self._tentar_depois = agora + self._espera if carga.falhas else None
+            self._ultimo = None
             if len(carga.falhas) >= len(CONSULTAS):
                 logger.error("nenhuma tabela respondeu")
                 if self._bom is None:
                     raise BaseIndisponivel("a base do IA.med está indisponível")
-                return Corpus(
+                self._ultimo = Corpus(
                     registros=self._bom.registros,
                     carregado_em=self._bom.carregado_em,
                     faltando=list(carga.falhas),
                     especialidades_conhecidas=self._bom.especialidades_conhecidas,
                 )
+                return self._ultimo
             conhecidas = sorted(
                 {
                     _texto(linha.get("especialidade"))
@@ -279,6 +294,8 @@ class CacheCorpus:
                 faltando=list(carga.falhas),
                 especialidades_conhecidas=tuple(conhecidas),
             )
-            if not carga.falhas:
+            if carga.falhas:
+                self._ultimo = corpus
+            else:
                 self._bom = corpus
             return corpus

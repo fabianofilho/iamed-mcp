@@ -15,6 +15,7 @@ import time
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal, Protocol
 
+import pydantic_core
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
@@ -54,8 +55,12 @@ RESUMO_LISTA = 400
 RESUMO_ITEM = 2000
 TAGS_MAXIMO = 10
 TAG_MAXIMO = 100
-# A resposta estruturada nunca passa disto; o que sobrar fica para a próxima página.
-RESPOSTA_MAXIMA = 95_000
+# Teto da resposta inteira em bytes (spec 7.4: abaixo de 100 KB). O SDK manda o
+# conteúdo duas vezes: structured_content e um TextContent com o mesmo JSON
+# indentado, escapado de novo dentro do envelope. _custo conta as duas cópias.
+RESPOSTA_MAXIMA = 90_000
+# Corpo de requisição aceito; uma chamada legítima tem poucas centenas de bytes.
+CORPO_MAXIMO = 64 * 1024
 
 _NOME_DO_TIPO: dict[str, str] = {
     "articles": "artigo",
@@ -152,13 +157,23 @@ def _avisos(corpus: Corpus, extras: list[str]) -> str:
     return " ".join(partes)
 
 
+def _custo(item: ItemLista) -> int:
+    """Bytes que o item ocupa na resposta, somando as duas cópias do SDK."""
+    dados = item.model_dump()
+    compacto = pydantic_core.to_json(dados)
+    indentado = pydantic_core.to_json(dados, indent=2).decode()
+    return len(compacto) + len(json.dumps(indentado, ensure_ascii=False).encode())
+
+
 def _resposta(corpus: Corpus, pagina: Pagina) -> RespostaLista:
     itens = [_item_lista(r) for r in pagina.registros]
     avisos = list(pagina.avisos)
     tem_mais = pagina.tem_mais
-    tamanho = sum(len(json.dumps(i.model_dump(), ensure_ascii=False)) for i in itens)
+    custos = [_custo(i) for i in itens]
+    tamanho = sum(custos)
     while itens and tamanho > RESPOSTA_MAXIMA:
-        tamanho -= len(json.dumps(itens.pop().model_dump(), ensure_ascii=False))
+        itens.pop()
+        tamanho -= custos.pop()
         tem_mais = True
     if len(itens) < len(pagina.registros):
         avisos.append(f"Resposta cortada em {len(itens)} itens por tamanho. Peça um limite menor.")
@@ -185,7 +200,7 @@ TipoParam = Literal["artigo", "news", "episodio", "aula", "evento", "conferencia
 
 @mcp.tool(annotations=_SOMENTE_LEITURA)
 async def listar_recentes(
-    tipos: list[TipoParam] | None = None,
+    tipos: Annotated[list[TipoParam] | None, Field(max_length=7)] = None,
     dias: Annotated[int, Field(ge=1, le=365)] = 14,
     especialidade: Annotated[str | None, Field(max_length=60)] = None,
     escopo: Literal["nacional", "internacional"] | None = None,
@@ -252,7 +267,7 @@ async def listar_recentes(
 @mcp.tool(annotations=_SOMENTE_LEITURA)
 async def buscar(
     tema: Annotated[str, Field(min_length=2, max_length=200)],
-    tipos: list[TipoParam] | None = None,
+    tipos: Annotated[list[TipoParam] | None, Field(max_length=7)] = None,
     especialidade: Annotated[str | None, Field(max_length=60)] = None,
     dias: Annotated[int | None, Field(ge=1, le=3650)] = None,
     limite: Annotated[int, Field(ge=1, le=30)] = 10,
@@ -369,6 +384,52 @@ def _seguranca_de_transporte(config: Config) -> Any:
     return TransportSecuritySettings(allowed_hosts=hosts, allowed_origins=origens)
 
 
+async def _responder(
+    send: Any, status: int, corpo: bytes, extras: list[tuple[bytes, bytes]] | None = None
+) -> None:
+    await send(
+        {
+            "type": "http.response.start",
+            "status": status,
+            "headers": [(b"content-type", b"application/json"), *(extras or [])],
+        }
+    )
+    await send({"type": "http.response.body", "body": corpo})
+
+
+async def _corpo_limitado(scope: Any, receive: Any) -> Any:
+    """Recusa corpo acima de CORPO_MAXIMO antes de o SDK ler tudo na memória.
+
+    Com content-length: decide pelo cabeçalho e devolve True (o receive original
+    serve). Sem ele (chunked): lê até o teto e devolve um receive que repete o
+    que foi lido. None quando passa do teto.
+    """
+    cabecalhos = {k.lower(): v for k, v in scope.get("headers") or []}
+    tamanho = cabecalhos.get(b"content-length")
+    if tamanho is not None:
+        try:
+            return True if int(tamanho) <= CORPO_MAXIMO else None
+        except ValueError:
+            return None
+    mensagens: list[Any] = []
+    total = 0
+    while True:
+        mensagem = await receive()
+        mensagens.append(mensagem)
+        if mensagem.get("type") != "http.request":
+            break
+        total += len(mensagem.get("body", b""))
+        if total > CORPO_MAXIMO:
+            return None
+        if not mensagem.get("more_body"):
+            break
+
+    async def repetir() -> Any:
+        return mensagens.pop(0) if mensagens else await receive()
+
+    return repetir
+
+
 def _com_limite(app: Any, limite_por_minuto: int, limite_global: int) -> Any:
     """Embrulha o app ASGI com o teto de requisições global e por origem."""
     limitador = LimitadorPorOrigem(limite_por_minuto, limite_global)
@@ -398,9 +459,16 @@ def _com_limite(app: Any, limite_por_minuto: int, limite_global: int) -> Any:
                 }
             )
             return
+        receber = await _corpo_limitado(scope, receive)
+        if receber is None:
+            logger.warning(
+                "corpo acima de %d bytes (origem %s)", CORPO_MAXIMO, zerar_ultimo_octeto(origem)
+            )
+            await _responder(send, 413, b'{"erro":"corpo da requisicao grande demais"}')
+            return
         marca = origem_atual.set(zerar_ultimo_octeto(origem))
         try:
-            await app(scope, receive, send)
+            await app(scope, receive if receber is True else receber, send)
         finally:
             origem_atual.reset(marca)
 

@@ -316,9 +316,12 @@ async def test_carga_parcial_serve_mas_nao_guarda(config: Config) -> None:
     parcial.falhas = ["episodes"]
     carregar = Carregador(parcial, _boa())
     cache = CacheCorpus(config, carregar=carregar, relogio=Relogio())
+    relogio = cache._relogio
     corpus = await cache.obter()
     assert corpus.faltando == ["episodes"]
     assert len(corpus.registros) == 1
+    assert isinstance(relogio, Relogio)
+    relogio.agora = AGORA + timedelta(seconds=31)
     corpus = await cache.obter()
     assert carregar.chamadas == 2
     assert corpus.faltando == []
@@ -351,3 +354,46 @@ async def test_especialidades_conhecidas(config: Config) -> None:
     cache = CacheCorpus(config, carregar=Carregador(carga), relogio=Relogio())
     corpus = await cache.obter()
     assert corpus.especialidades_conhecidas == ("Cardiologia", "Radiologia")
+
+
+async def test_falha_parcial_nao_recarrega_a_cada_chamada(config: Config) -> None:
+    relogio = Relogio()
+    parcial = _boa()
+    parcial.falhas = ["episodes"]
+    carregar = Carregador(parcial, _boa(), espera=0.01)
+    cache = CacheCorpus(config, carregar=carregar, relogio=relogio)
+    await asyncio.gather(*(cache.obter() for _ in range(10)))
+    corpus = await cache.obter()
+    assert carregar.chamadas == 1
+    assert corpus.faltando == ["episodes"]
+    relogio.agora = AGORA + timedelta(seconds=31)
+    corpus = await cache.obter()
+    assert carregar.chamadas == 2
+    assert corpus.faltando == []
+
+
+async def test_falha_total_sem_cache_nao_recarrega_a_cada_chamada(config: Config) -> None:
+    relogio = Relogio()
+    carregar = Carregador(_falha_total())
+    cache = CacheCorpus(config, carregar=carregar, relogio=relogio)
+    for _ in range(5):
+        with pytest.raises(BaseIndisponivel):
+            await cache.obter()
+    assert carregar.chamadas == 1
+    relogio.agora = AGORA + timedelta(seconds=31)
+    with pytest.raises(BaseIndisponivel):
+        await cache.obter()
+    assert carregar.chamadas == 2
+
+
+async def test_falha_total_com_cache_anterior_nao_recarrega_a_cada_chamada(
+    config: Config,
+) -> None:
+    relogio = Relogio()
+    carregar = Carregador(_boa(), _falha_total())
+    cache = CacheCorpus(config, carregar=carregar, relogio=relogio)
+    await cache.obter()
+    relogio.agora = AGORA + timedelta(seconds=400)
+    for _ in range(5):
+        await cache.obter()
+    assert carregar.chamadas == 2

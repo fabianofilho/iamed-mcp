@@ -104,6 +104,7 @@ async def test_buscar_devolve_o_que_casa(base_padrao: None) -> None:
         ("listar_recentes", {"dias": 366}),
         ("listar_recentes", {"pagina": 21}),
         ("listar_recentes", {"tipos": ["consultoria"]}),
+        ("listar_recentes", {"tipos": ["news"] * 8}),
         ("buscar", {"tema": "a"}),
         ("buscar", {"tema": "x" * 201}),
         ("buscar", {"tema": "sepse", "limite": 31}),
@@ -156,13 +157,15 @@ async def test_base_indisponivel_erro_claro() -> None:
 
 
 async def test_maior_resposta_abaixo_de_100kb() -> None:
+    # A resposta leva o JSON duas vezes (TextContent e structured_content) e o
+    # teto vale em bytes, com o escape padrão do JSON.
     grandes = [
         reg(
             i,
-            "T" * 2000,
-            resumo="R" * 10_000,
-            tags=tuple("t" * 500 + str(j) for j in range(30)),
-            especialidades=("Radiologia",) * 1,
+            "é" * 2000,
+            resumo="é" * 10_000,
+            tags=tuple("é" * 500 + str(j) for j in range(30)),
+            especialidades=("Radiologia",),
             fonte="https://x.org/" + "a" * 2000,
         )
         for i in range(60)
@@ -170,9 +173,9 @@ async def test_maior_resposta_abaixo_de_100kb() -> None:
     definir_cache(CacheFalso(_corpus(*grandes)))
     async with Client(mcp) as c:
         r = await c.call_tool("listar_recentes", {"limite": 50})
-    assert r.structured_content is not None
     dados = r.structured_content
-    assert len(json.dumps(dados, ensure_ascii=False)) < 100_000
+    assert dados is not None
+    assert len(r.model_dump_json().encode()) < 100_000
     assert 0 < len(dados["itens"]) < 50
     assert dados["tem_mais"] is True
     assert "cortada" in dados["aviso"]

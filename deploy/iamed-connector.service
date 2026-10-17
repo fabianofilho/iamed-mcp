@@ -10,7 +10,14 @@
 #   systemctl --user enable --now iamed-connector
 #
 # A chave anon do Supabase fica em ~/iamed-mcp/.env (modo 600), nunca no
-# repositório. O servidor recusa subir com chave que não seja anon.
+# repositório; o servidor lê esse arquivo sozinho a partir do WorkingDirectory.
+# Não use EnvironmentFile= aqui: no systemd ele vence Environment=, e um .env
+# copiado do .env.example (TRANSPORTE=stdio) derrubaria o modo conector. As
+# variáveis abaixo vencem o .env no pydantic-settings.
+# O servidor recusa subir com chave que não seja anon.
+#
+# Antes de instalar: `uv sync --frozen --no-dev` no checkout, para criar o .venv
+# que o ExecStart usa (o serviço não roda uv, porque a home é só leitura).
 #
 # Risco conhecido: o ExecStart roda o código que estiver em ~/iamed-mcp a cada
 # (re)start. Mantenha essa pasta como checkout dedicado na main, não como
@@ -24,7 +31,6 @@ After=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=%h/iamed-mcp
-EnvironmentFile=%h/iamed-mcp/.env
 Environment=TRANSPORTE=streamable-http
 Environment=HTTP_HOST=127.0.0.1
 Environment=HTTP_PORTA=8107
@@ -35,7 +41,7 @@ Environment=HTTP_STATELESS=true
 Environment=HTTP_HOSTS_PUBLICOS=debian-f.tailf42a96.ts.net
 Environment=HTTP_LIMITE_GLOBAL_POR_MINUTO=300
 Environment=HTTP_LIMITE_POR_MINUTO=60
-ExecStart=%h/.local/bin/uv --directory %h/iamed-mcp run --no-sync iamed-mcp
+ExecStart=%h/iamed-mcp/.venv/bin/iamed-mcp
 Restart=always
 RestartSec=5
 # O servidor não grava nada: sem nenhum caminho gravável.
@@ -43,6 +49,10 @@ ProtectSystem=strict
 ProtectHome=read-only
 PrivateTmp=true
 NoNewPrivileges=true
+# A máquina serve outros conectores: teto de memória, CPU e tarefas.
+MemoryMax=512M
+CPUQuota=50%
+TasksMax=64
 
 [Install]
 WantedBy=default.target
