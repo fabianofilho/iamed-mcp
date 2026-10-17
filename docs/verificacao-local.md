@@ -50,4 +50,10 @@ Inspector, abaixo.
 
 ## Testes automatizados
 
-`make check`: ruff e mypy (strict) limpos, 107 testes passando.
+`make check`: ruff e mypy (strict) limpos, 117 testes passando.
+
+## Depois da revisão final
+
+- Página máxima real (`listar_recentes limite=50 dias=60`, total 203): 50
+  itens, **93.948 bytes** na rede (POST direto ao endpoint), abaixo dos 100 KB.
+- POST com corpo de 70 KB: **413**.
