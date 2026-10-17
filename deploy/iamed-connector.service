@@ -1,0 +1,48 @@
+# Servidor MCP do IA.med em HTTP, para hospedar como conector.
+#
+# Escuta só no loopback de propósito. Quem publica para fora é o Tailscale
+# Funnel, na rota /iamed, apontando para esta porta. Assim a decisão de expor
+# fica num lugar só.
+#
+# Instalar como serviço de usuário (no debian-f, usuário f):
+#   cp deploy/iamed-connector.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now iamed-connector
+#
+# A chave anon do Supabase fica em ~/iamed-mcp/.env (modo 600), nunca no
+# repositório. O servidor recusa subir com chave que não seja anon.
+#
+# Risco conhecido: o ExecStart roda o código que estiver em ~/iamed-mcp a cada
+# (re)start. Mantenha essa pasta como checkout dedicado na main, não como
+# árvore de desenvolvimento.
+
+[Unit]
+Description=Servidor MCP do IA.med em HTTP (modo connector)
+Documentation=https://github.com/fabianofilho/iamed-mcp
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/iamed-mcp
+EnvironmentFile=%h/iamed-mcp/.env
+Environment=TRANSPORTE=streamable-http
+Environment=HTTP_HOST=127.0.0.1
+Environment=HTTP_PORTA=8107
+Environment=HTTP_PATH=/mcp
+Environment=HTTP_STATELESS=true
+# Nome público pelo qual o Funnel chama este servidor. Sem ele, o SDK
+# responde 421 (Invalid Host) a tudo que vier de fora.
+Environment=HTTP_HOSTS_PUBLICOS=debian-f.tailf42a96.ts.net
+Environment=HTTP_LIMITE_GLOBAL_POR_MINUTO=300
+Environment=HTTP_LIMITE_POR_MINUTO=60
+ExecStart=%h/.local/bin/uv --directory %h/iamed-mcp run --no-sync iamed-mcp
+Restart=always
+RestartSec=5
+# O servidor não grava nada: sem nenhum caminho gravável.
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

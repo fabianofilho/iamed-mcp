@@ -117,3 +117,20 @@ def test_host_de_fora_da_lista_continua_recusado() -> None:
     assert guarda._validate_host("debian-f.tailf42a96.ts.net") is True
     assert guarda._validate_host("site-do-atacante.exemplo") is False
     assert guarda._validate_host(None) is False
+
+
+async def test_middleware_expoe_origem_zerada_para_o_log() -> None:
+    from iamed_mcp.mcp_server.server import origem_atual
+
+    vista: list[str] = []
+
+    async def app(scope: Any, receive: Any, send: Any) -> None:
+        vista.append(origem_atual.get())
+
+    async def nada(*_: Any) -> None:
+        return None
+
+    protegido = _com_limite(app, limite_por_minuto=60, limite_global=300)
+    await protegido({"type": "http", "client": ("198.51.100.7", 1), "headers": []}, nada, nada)
+    assert vista == ["198.51.100.0"]
+    assert origem_atual.get() == "local"

@@ -7,6 +7,7 @@ no Supabase com a chave anon. Nenhuma tool escreve, manda mensagem ou busca URL.
 
 from __future__ import annotations
 
+import contextvars
 import json
 import logging
 import sys
@@ -43,6 +44,10 @@ from iamed_mcp.saida import (
 
 logger = logging.getLogger(__name__)
 uso = logging.getLogger("iamed_mcp.uso")
+
+# Origem da requisição HTTP, já com o último octeto zerado, para o log de uso.
+# Em stdio fica "local".
+origem_atual: contextvars.ContextVar[str] = contextvars.ContextVar("origem", default="local")
 
 TITULO_MAXIMO = 300
 RESUMO_LISTA = 400
@@ -170,7 +175,9 @@ def _resposta(corpus: Corpus, pagina: Pagina) -> RespostaLista:
 def _registrar(tool: str, inicio: float, resultado: str, **campos: Any) -> None:
     detalhes = " ".join(f"{k}={v}" for k, v in campos.items())
     ms = int((time.monotonic() - inicio) * 1000)
-    uso.info("tool=%s %s ms=%d resultado=%s", tool, detalhes, ms, resultado)
+    uso.info(
+        "tool=%s %s ms=%d resultado=%s origem=%s", tool, detalhes, ms, resultado, origem_atual.get()
+    )
 
 
 TipoParam = Literal["artigo", "news", "episodio", "aula", "evento", "conferencias", "repo"]
@@ -391,7 +398,11 @@ def _com_limite(app: Any, limite_por_minuto: int, limite_global: int) -> Any:
                 }
             )
             return
-        await app(scope, receive, send)
+        marca = origem_atual.set(zerar_ultimo_octeto(origem))
+        try:
+            await app(scope, receive, send)
+        finally:
+            origem_atual.reset(marca)
 
     return middleware
 

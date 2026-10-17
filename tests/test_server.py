@@ -204,3 +204,10 @@ async def test_handshake_sem_prompts_e_resources(base_padrao: None) -> None:
         assert capacidades.prompts is None
         assert capacidades.resources is None
         assert capacidades.tools is not None
+
+
+async def test_log_traz_origem(caplog: pytest.LogCaptureFixture, base_padrao: None) -> None:
+    with caplog.at_level(logging.INFO, logger="iamed_mcp.uso"):
+        async with Client(mcp) as cliente:
+            await cliente.call_tool("listar_recentes", {})
+    assert "origem=local" in caplog.text
