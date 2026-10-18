@@ -65,6 +65,27 @@ com `Retry-After: 60`), corpo de requisição até 64 KB (acima, 413) e resposta
 abaixo de 100 KB. Se o Supabase falhar, o servidor espera 30 s antes de tentar
 ler de novo.
 
+### Login com a conta do IA.med (desligado por padrão)
+
+Com `MCP_LOGIN=supabase`, o conector só atende quem entrou com a conta do app e
+tem plano Residente ou acima (ou trial ativo), pela mesma regra do app. O login é
+emitido pelo servidor OAuth 2.1 do Supabase do IA.med; o servidor só confere o
+token (ES256, pela chave pública do projeto) e lê o plano em `profiles` com o
+token do próprio usuário. Não há chave de serviço.
+
+| Variável | Para quê |
+| --- | --- |
+| `MCP_LOGIN` | `supabase` liga; vazio deixa aberto, como antes |
+| `MCP_LOGIN_RECURSO` | URL pública exata do MCP, por exemplo `https://host/iamed/mcp` |
+| `MCP_LOGIN_PLANO_MINIMO` | `residente` por padrão |
+| `MCP_LOGIN_LIMITE_POR_USUARIO` | requisições por minuto por usuário, 60 por padrão |
+
+Respostas: 401 sem token ou com token inválido, 403 sem o plano (com o link para
+a página de planos), 503 quando não dá para ler o plano. O metadata do recurso
+(RFC 9728) fica em `/.well-known/oauth-protected-resource` dentro do próprio
+prefixo, porque o Funnel não encaminha a raiz do host. Plano e riscos:
+`docs/LOGIN.md` na mcps-suite.
+
 ## Desligar rápido
 
 Do mais rápido para o mais completo (no debian-f, ou pelo Mac com

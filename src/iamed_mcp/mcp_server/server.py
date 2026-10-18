@@ -32,6 +32,7 @@ from iamed_mcp.mcp_server.limite import (
     origem_da_requisicao,
     zerar_ultimo_octeto,
 )
+from iamed_mcp.mcp_server.login import LoginSupabase
 from iamed_mcp.saida import (
     AVISO,
     ItemCompleto,
@@ -505,13 +506,29 @@ def main() -> None:
 
     import uvicorn
 
+    app_mcp: Any = mcp.streamable_http_app(
+        streamable_http_path=config.http_path,
+        stateless_http=config.http_stateless,
+        host=config.http_host,
+        transport_security=_seguranca_de_transporte(config),
+    )
+    if config.mcp_login == "supabase":
+        login = LoginSupabase(
+            supabase_url=config.supabase_url,
+            chave_anon=config.supabase_anon_key.get_secret_value(),
+            recurso=config.mcp_login_recurso,
+            caminho_mcp=config.http_path,
+            plano_minimo=config.mcp_login_plano_minimo,
+            limite_por_usuario=config.mcp_login_limite_por_usuario,
+        )
+        app_mcp = login.proteger(app_mcp)
+        logger.info(
+            "login ligado: plano %s ou acima, recurso %s",
+            config.mcp_login_plano_minimo,
+            config.mcp_login_recurso,
+        )
     app = _com_limite(
-        mcp.streamable_http_app(
-            streamable_http_path=config.http_path,
-            stateless_http=config.http_stateless,
-            host=config.http_host,
-            transport_security=_seguranca_de_transporte(config),
-        ),
+        app_mcp,
         config.http_limite_por_minuto,
         config.http_limite_global_por_minuto,
     )
