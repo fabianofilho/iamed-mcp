@@ -11,11 +11,10 @@ encaminha o prefixo de cada servidor (`/iamed/*`). A descoberta daria 404. Aqui 
 metadata fica dentro do prefixo e o `WWW-Authenticate` aponta para ele, que é o
 endereço que o cliente segue.
 
-**Por que o plano é lido com o token do próprio usuário.** A política
-"Users can view own profile" deixa cada um ler a própria linha de `profiles`. Com
-o token dele e a chave anon, o servidor lê o plano sem chave de serviço e sem hook
-no Supabase. O trigger `protect_profile_privileged_columns` impede o usuário de
-mudar o próprio plano, então a linha é confiável.
+**Por que o plano é lido com o token do próprio usuário.** A RLS do app só
+devolve a linha do próprio usuário em `profiles`, e o banco não deixa ninguém
+mudar o próprio plano. Com o token dele e a chave anon, o servidor lê o plano sem
+chave de serviço e sem hook no Supabase.
 
 **O token não é preso a este servidor.** O Supabase emite `aud = "authenticated"`,
 igual à sessão comum do app. O `client_id` obrigatório separa o token OAuth da

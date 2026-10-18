@@ -79,6 +79,7 @@ token do próprio usuário. Não há chave de serviço.
 | `MCP_LOGIN_RECURSO` | URL pública exata do MCP, por exemplo `https://host/iamed/mcp` |
 | `MCP_LOGIN_PLANO_MINIMO` | `residente` por padrão |
 | `MCP_LOGIN_LIMITE_POR_USUARIO` | requisições por minuto por usuário, 60 por padrão |
+| `MCP_LOGIN_EMISSORES` | emissores aceitos no token, separados por vírgula; vazio é `SUPABASE_URL` + `/auth/v1` |
 
 Respostas: 401 sem token ou com token inválido, 403 sem o plano (com o link para
 a página de planos), 503 quando não dá para ler o plano. O metadata do recurso

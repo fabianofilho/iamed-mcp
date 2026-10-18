@@ -80,6 +80,16 @@ class Config(BaseSettings):
         Field(default="residente")
     )
     mcp_login_limite_por_usuario: int = Field(default=60, ge=1)
+    # Emissores aceitos no `iss`. Vazio = <SUPABASE_URL>/auth/v1, que é o que a
+    # descoberta OIDC do projeto anuncia. O primeiro vai no metadata do recurso.
+    mcp_login_emissores: Annotated[list[str], NoDecode] = Field(default_factory=list)
+
+    @field_validator("mcp_login_emissores", mode="before")
+    @classmethod
+    def _dividir_emissores(cls, valor: object) -> object:
+        if isinstance(valor, str):
+            return [p.strip() for p in valor.split(",") if p.strip()]
+        return valor
 
     @field_validator("http_hosts_publicos", mode="before")
     @classmethod

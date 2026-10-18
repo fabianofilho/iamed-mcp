@@ -219,3 +219,17 @@ def test_limite_por_usuario() -> None:
     _perfil(respx.mock, plan_tier="residente", subscription_status="active")
     login = _login(limite_por_usuario=2)
     assert [_chamar(login, token=_token())[0] for _ in range(3)] == [200, 200, 429]
+
+
+def test_emissor_configuravel_vale_no_token_e_no_metadata() -> None:
+    outro = "https://auth.exemplo/auth/v1"
+    login = _login(emissores=[outro])
+    assert login.metadata()["authorization_servers"] == [outro]
+    assert asyncio.run(login.conferir(_token())).status == 401  # type: ignore[union-attr]
+
+
+def test_config_divide_emissores(monkeypatch: pytest.MonkeyPatch) -> None:
+    from iamed_mcp.config import Config
+
+    monkeypatch.setenv("MCP_LOGIN_EMISSORES", "https://a/auth/v1, https://b/auth/v1")
+    assert Config(_env_file=None).mcp_login_emissores == ["https://a/auth/v1", "https://b/auth/v1"]
