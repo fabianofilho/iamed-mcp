@@ -71,6 +71,26 @@ class Config(BaseSettings):
     # Nomes públicos aceitos no cabeçalho Host (proteção contra DNS rebinding).
     http_hosts_publicos: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
+    # --- login (connector pago; docs/LOGIN.md na mcps-suite) ---
+    # Vazio = aberto, como sempre foi. "supabase" exige a conta do IA.med e o plano.
+    mcp_login: Literal["", "supabase"] = Field(default="")
+    # URL pública exata do MCP, como o cliente a usa (ex.: https://host/iamed/mcp).
+    mcp_login_recurso: str = Field(default="")
+    mcp_login_plano_minimo: Literal["interno", "residente", "especialista", "doutor", "pos-doc"] = (
+        Field(default="residente")
+    )
+    mcp_login_limite_por_usuario: int = Field(default=60, ge=1)
+    # Emissores aceitos no `iss`. Vazio = <SUPABASE_URL>/auth/v1, que é o que a
+    # descoberta OIDC do projeto anuncia. O primeiro vai no metadata do recurso.
+    mcp_login_emissores: Annotated[list[str], NoDecode] = Field(default_factory=list)
+
+    @field_validator("mcp_login_emissores", mode="before")
+    @classmethod
+    def _dividir_emissores(cls, valor: object) -> object:
+        if isinstance(valor, str):
+            return [p.strip() for p in valor.split(",") if p.strip()]
+        return valor
+
     @field_validator("http_hosts_publicos", mode="before")
     @classmethod
     def _dividir_hosts(cls, valor: object) -> object:
@@ -84,4 +104,6 @@ def carregar_config() -> Config:
     """Lê a configuração e recusa chave que não seja anon."""
     config = Config()
     validar_chave_anon(config.supabase_anon_key.get_secret_value())
+    if config.mcp_login and not config.mcp_login_recurso.startswith("https://"):
+        raise ValueError("MCP_LOGIN ligado exige MCP_LOGIN_RECURSO com a URL pública https do MCP")
     return config
