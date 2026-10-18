@@ -7,6 +7,7 @@ import pytest
 from iamed_mcp.saida import (
     AVISO,
     TIPOS,
+    e_preprint,
     limpar_texto,
     link_app,
     link_externo,
@@ -122,3 +123,25 @@ def test_link_externo_aceita_editora() -> None:
 )
 def test_link_externo_recusa_arquivo_do_app(url: str) -> None:
     assert link_externo(url) is None
+
+
+@pytest.mark.parametrize(
+    ("url", "esperado"),
+    [
+        ("https://arxiv.org/abs/2510.00001", True),
+        ("https://www.medrxiv.org/content/10.1101/x", True),
+        ("https://www.biorxiv.org/content/x", True),
+        ("https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1", True),
+        ("https://ssrn.com/abstract=1", True),
+        ("https://www.researchsquare.com/article/rs-1", True),
+        ("https://www.preprints.org/manuscript/1", True),
+        ("https://www.nature.com/articles/x", False),
+        ("https://doi.org/10.1001/jama.2026.1", False),
+        ("https://notarxiv.org/abs/1", False),
+        ("https://doi.org/10.1101/2026.01.01.123", True),
+        ("https://doi.org/10.48550/arXiv.2510.1", True),
+        (None, False),
+    ],
+)
+def test_e_preprint(url: str | None, esperado: bool) -> None:
+    assert e_preprint(url) is esperado

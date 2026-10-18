@@ -214,3 +214,26 @@ async def test_log_traz_origem(caplog: pytest.LogCaptureFixture, base_padrao: No
         async with Client(mcp) as cliente:
             await cliente.call_tool("listar_recentes", {})
     assert "origem=local" in caplog.text
+
+
+async def test_geral_e_preprint() -> None:
+    definir_cache(
+        CacheFalso(
+            _corpus(
+                reg(1, "Preprint", fonte="https://arxiv.org/abs/2510.1"),
+                reg(2, "Revista", fonte="https://www.nature.com/x", especialidades=("Radiologia",)),
+                reg(3, "Repo", tipo="repo", fonte="https://arxiv.org/abs/2510.2"),
+                reg(4, "News", tipo="news", fonte="https://www.medrxiv.org/content/1"),
+            )
+        )
+    )
+    async with Client(mcp) as cliente:
+        itens = {}
+        for n in (1, 2, 3, 4):
+            r = await cliente.call_tool("abrir_item", {"id": f"00000000-0000-4000-8000-{n:012d}"})
+            assert r.structured_content is not None
+            itens[n] = r.structured_content["item"]
+    assert (itens[1]["preprint"], itens[1]["geral"]) == (True, True)
+    assert (itens[2]["preprint"], itens[2]["geral"]) == (False, False)
+    assert itens[3]["preprint"] is False
+    assert itens[4]["preprint"] is True

@@ -38,6 +38,7 @@ from iamed_mcp.saida import (
     ItemLista,
     RespostaItem,
     RespostaLista,
+    e_preprint,
     limpar_texto,
     link_app,
     normalizar_id,
@@ -122,6 +123,10 @@ def _tags(registro: Registro) -> list[str]:
     return [t for t in tags if t]
 
 
+# Repositório com link do arXiv é código, não o artigo; o selo vale para texto.
+_TIPOS_COM_PREPRINT = ("artigo", "news")
+
+
 def _item_lista(registro: Registro) -> ItemLista:
     resumo, cortado = limpar_texto(registro.resumo, RESUMO_LISTA)
     return ItemLista(
@@ -132,6 +137,8 @@ def _item_lista(registro: Registro) -> ItemLista:
         resumo_cortado=cortado,
         tags=_tags(registro),
         especialidades=list(registro.especialidades),
+        geral=not registro.especialidades,
+        preprint=registro.tipo in _TIPOS_COM_PREPRINT and e_preprint(registro.fonte),
         data=_iso(registro.data),
         escopo=registro.escopo,
         link_app=link_app(registro.tipo, registro.id),
@@ -213,8 +220,11 @@ async def listar_recentes(
     e conferências entram também até `dias` à frente (os próximos vêm primeiro).
     Cada item traz título, resumo (até 400 caracteres; abrir_item traz mais),
     tags, especialidades, data, `link_app` (página no app IA.med) e `fonte` (link
-    original, quando há). `total` é quantos casam na base inteira; use `pagina`
-    para ver mais quando `tem_mais` for true.
+    original, quando há). `geral` é true quando nenhuma especialidade tem nota forte
+    (tema de IA na medicina em geral, não falta de dado); `preprint` é true quando
+    a fonte é arXiv, medRxiv, bioRxiv, SSRN, Research Square ou Preprints.org, ou
+    seja, sem revisão por pares: diga isso ao citar. `total` é quantos casam na
+    base inteira; use `pagina` para ver mais quando `tem_mais` for true.
 
     Args:
         tipos: artigo, news, episodio (podcast), aula, evento, conferencias, repo

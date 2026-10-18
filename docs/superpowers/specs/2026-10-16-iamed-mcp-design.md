@@ -86,6 +86,13 @@ artigo por `link_externo`, que recusa host `supabase.co`, `iamed.cc` e caminho
 aula e podcast são por plano e, na aula, a "URL Mídia" é o próprio vídeo.
 Episódio continua com `spotify_url` (28 de 37 têm).
 
+Campos derivados (18/10/2026, decisão do Fabiano): `geral` é true quando o item
+não tem especialidade com nota >= 0,7 (medido na semana de 12 a 18/10: 23 de 32
+itens; 6 são evento ou conferência, fora da pontuação de propósito, e 17 ficaram
+abaixo do limiar; baixar para 0,5 só ganharia 2). O limiar não muda. `preprint`
+é true em artigo e news cuja `fonte` é arXiv, medRxiv, bioRxiv, SSRN, Research
+Square ou Preprints.org, pelo host ou pelo prefixo do DOI (101 de 293 artigos).
+
 Achado registrado (fora do escopo): `articles.content_markdown` e
 `lessons.content_markdown` são legíveis pela anon. Hoje estão vazias em todas
 as linhas (conferido como anon: 0 de 283 artigos e 0 aulas com corpo), porque o
