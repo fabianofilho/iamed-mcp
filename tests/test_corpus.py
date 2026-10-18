@@ -43,6 +43,7 @@ def test_mapeia_cada_tabela() -> None:
                 "summary": "Res",
                 "tags": ["IA"],
                 "published_at": _iso(1),
+                "pdf_url": "https://arxiv.org/abs/2510.00001",
             }
         ],
         notion_content=[
@@ -96,7 +97,7 @@ def test_mapeia_cada_tabela() -> None:
         "Res",
         ("IA",),
     )
-    assert artigo.fonte is None
+    assert artigo.fonte == "https://arxiv.org/abs/2510.00001"
     assert artigo.data == AGORA - timedelta(days=1)
     assert (news.tipo, news.escopo, news.fonte, news.tags) == (
         "news",
@@ -397,3 +398,29 @@ async def test_falha_total_com_cache_anterior_nao_recarrega_a_cada_chamada(
     for _ in range(5):
         await cache.obter()
     assert carregar.chamadas == 2
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://iutwiaxeienjhvkvrcul.supabase.co/storage/v1/object/public/pdfs/a.pdf",
+        "https://auth.iamed.cc/storage/v1/object/sign/pdfs/a.pdf?token=x",
+        "https://app.iamed.cc/artigos/1",
+        "ftp://x.org/a.pdf",
+    ],
+)
+def test_fonte_do_artigo_nunca_e_arquivo_do_app(url: str) -> None:
+    carga = _carga(
+        articles=[
+            {
+                "id": ID_A,
+                "title": "A",
+                "summary": "",
+                "tags": [],
+                "published_at": _iso(1),
+                "pdf_url": url,
+            }
+        ]
+    )
+    (reg,) = montar_registros(carga, AGORA)
+    assert reg.fonte is None

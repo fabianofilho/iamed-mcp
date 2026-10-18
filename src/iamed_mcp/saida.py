@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from typing import Literal
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel
 
@@ -73,6 +74,27 @@ def link_seguro(url: str | None) -> str | None:
     if any(c.isspace() or not _permitido(c) for c in url):
         return None
     if not re.match(r"^https?://[^/?#\s]+", url, re.IGNORECASE):
+        return None
+    return url
+
+
+_HOSTS_DO_APP = ("supabase.co", "iamed.cc")
+
+
+def link_externo(url: str | None) -> str | None:
+    """`link_seguro` que recusa arquivo guardado pelo próprio app.
+
+    Para colunas de mídia (`articles.pdf_url`): hoje só têm a página ou o DOI
+    do artigo, mas um PDF subido no storage ou link do app não pode sair.
+    """
+    url = link_seguro(url)
+    if url is None:
+        return None
+    partes = urlsplit(url)
+    host = (partes.hostname or "").lower()
+    if any(host == h or host.endswith("." + h) for h in _HOSTS_DO_APP):
+        return None
+    if "/storage/v1/" in partes.path:
         return None
     return url
 

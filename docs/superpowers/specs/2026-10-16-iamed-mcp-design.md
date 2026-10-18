@@ -69,14 +69,22 @@ Tabelas e colunas (lista fechada no código; nada fora dela é pedido):
 
 | Tabela | Colunas lidas | Tipo no MCP |
 |---|---|---|
-| `articles` | `id, title, summary, tags, published_at` | artigo |
+| `articles` | `id, title, summary, tags, published_at, pdf_url` | artigo |
 | `notion_content` | `id, tipo, titulo, resumo, tags, modulo, escopo, url_midia, data_publicacao` (só `tipo in (news, evento, conferencias, repo)`) | news, evento, conferencias, repo |
 | `episodes` | `id, title, description, spotify_url, published_at` | episodio |
 | `lessons` | `id, title, description, module, created_at` | aula |
 | `content_relevance` | `content_id, especialidade, score` (só `score >= 0.7`) | especialidade do item |
 
-Nunca pedidas: `content_markdown`, `pdf_url`, `audio_url`, `video_url`,
+Nunca pedidas: `content_markdown`, `audio_url`, `video_url`,
 `push_notified_at` e qualquer outra tabela.
+
+`articles.pdf_url` entrou em 18/10/2026: o sync-notion grava ali a "URL Mídia"
+do Notion, que nos artigos é a página ou o DOI (medido: 293 de 293 externos,
+arxiv, nature, doi.org, jama, lancet etc.; nenhum no storage). Vira a `fonte` do
+artigo por `link_externo`, que recusa host `supabase.co`, `iamed.cc` e caminho
+`/storage/v1/`. `video_url` (aula) e `audio_url` (episódio) seguem fechados:
+aula e podcast são por plano e, na aula, a "URL Mídia" é o próprio vídeo.
+Episódio continua com `spotify_url` (28 de 37 têm).
 
 Achado registrado (fora do escopo): `articles.content_markdown` e
 `lessons.content_markdown` são legíveis pela anon. Hoje estão vazias em todas
