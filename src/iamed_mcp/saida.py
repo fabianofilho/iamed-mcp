@@ -99,6 +99,31 @@ def link_externo(url: str | None) -> str | None:
     return url
 
 
+_HOSTS_PREPRINT = (
+    "arxiv.org",
+    "medrxiv.org",
+    "biorxiv.org",
+    "ssrn.com",
+    "researchsquare.com",
+    "preprints.org",
+)
+# Prefixos de DOI dos mesmos servidores (doi.org/10.1101/... é medRxiv/bioRxiv).
+_DOI_PREPRINT = ("10.1101/", "10.48550/", "10.2139/ssrn", "10.21203/rs", "10.20944/preprints")
+
+
+def e_preprint(url: str | None) -> bool:
+    """Se a fonte é um servidor de preprint (sem revisão por pares), pelo domínio ou DOI."""
+    if not url:
+        return False
+    partes = urlsplit(url)
+    host = (partes.hostname or "").lower()
+    if any(host == h or host.endswith("." + h) for h in _HOSTS_PREPRINT):
+        return True
+    if host in ("doi.org", "dx.doi.org"):
+        return partes.path.lstrip("/").lower().startswith(_DOI_PREPRINT)
+    return False
+
+
 def normalizar_id(id_: str) -> str | None:
     """Id no formato uuid com hífen e minúsculo; None se não for uuid."""
     bruto = id_.strip().replace("-", "").lower()
@@ -122,6 +147,8 @@ class ItemLista(BaseModel):
     resumo_cortado: bool
     tags: list[str]
     especialidades: list[str]
+    geral: bool
+    preprint: bool
     data: str | None
     escopo: str | None
     link_app: str
