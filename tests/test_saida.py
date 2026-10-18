@@ -4,7 +4,15 @@ from __future__ import annotations
 
 import pytest
 
-from iamed_mcp.saida import AVISO, TIPOS, limpar_texto, link_app, link_seguro, normalizar_id
+from iamed_mcp.saida import (
+    AVISO,
+    TIPOS,
+    limpar_texto,
+    link_app,
+    link_externo,
+    link_seguro,
+    normalizar_id,
+)
 
 ID = "34034afb-03ec-81a1-b2c3-d4e5f6a7b8c9"
 
@@ -94,3 +102,23 @@ def test_link_app_por_tipo() -> None:
     assert link_app("evento", ID) == f"{base}/eventos/{ID}"
     assert link_app("conferencias", ID) == f"{base}/conferencias"
     assert link_app("repo", ID) == f"{base}/repos/{ID}"
+
+
+def test_link_externo_aceita_editora() -> None:
+    assert link_externo("https://www.nature.com/articles/x") == "https://www.nature.com/articles/x"
+    assert link_externo("https://doi.org/10.1/abc") == "https://doi.org/10.1/abc"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://abc.supabase.co/rest/v1/x",
+        "https://ABC.SUPABASE.CO/x",
+        "https://iamed.cc/x",
+        "https://app.iamed.cc/x",
+        "https://outro.org/storage/v1/object/public/a.pdf",
+        "javascript:alert(1)",
+    ],
+)
+def test_link_externo_recusa_arquivo_do_app(url: str) -> None:
+    assert link_externo(url) is None

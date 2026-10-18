@@ -18,7 +18,7 @@ from typing import Any
 
 from iamed_mcp.config import Config
 from iamed_mcp.fonte import CONSULTAS, Carga, carregar_tabelas
-from iamed_mcp.saida import Tipo, link_seguro, normalizar_id
+from iamed_mcp.saida import Tipo, link_externo, link_seguro, normalizar_id
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +105,7 @@ def _de_artigo(linha: dict[str, Any]) -> _Bruto:
         resumo=_texto(linha.get("summary")),
         tags=_tags(linha.get("tags")),
         data=_data(linha.get("published_at")),
+        fonte=link_externo(linha.get("pdf_url")),
     )
 
 

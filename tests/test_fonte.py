@@ -10,7 +10,7 @@ from iamed_mcp.fonte import CONSULTAS, carregar_tabelas
 from tests.conftest import URL
 
 SELECTS = {
-    "articles": "id,title,summary,tags,published_at",
+    "articles": "id,title,summary,tags,published_at,pdf_url",
     "notion_content": "id,tipo,titulo,resumo,tags,modulo,escopo,url_midia,data_publicacao",
     "episodes": "id,title,description,spotify_url,published_at",
     "lessons": "id,title,description,module,created_at",
@@ -35,7 +35,7 @@ def test_lista_fechada_de_tabelas_e_colunas() -> None:
 
 
 def test_nenhuma_coluna_proibida() -> None:
-    proibidas = {"content_markdown", "pdf_url", "audio_url", "video_url", "push_notified_at", "*"}
+    proibidas = {"content_markdown", "audio_url", "video_url", "push_notified_at", "*"}
     for params in CONSULTAS.values():
         assert not proibidas & set(params["select"].split(","))
 

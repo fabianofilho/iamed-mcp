@@ -1,9 +1,11 @@
 """Leitura do espelho do Notion no Supabase, pela API REST, com a chave anon.
 
 A lista de tabelas e colunas é fechada: nada fora de CONSULTAS é pedido, e o
-corpo dos artigos e aulas (content_markdown), PDFs, áudios e vídeos ficam de
-fora de propósito. O espelho só tem itens com Status publicado (filtro do
-sync-notion do app).
+corpo dos artigos e aulas (content_markdown), áudios e vídeos ficam de fora de
+propósito. `articles.pdf_url` entra porque guarda a "URL Mídia" do Notion (a
+página ou o DOI do artigo, medido em 18/10/2026: 293 de 293 externos); a saída
+passa por `link_externo`, que recusa arquivo do storage e link do app. O
+espelho só tem itens com Status publicado (filtro do sync-notion do app).
 
 Erro de uma tabela não derruba a carga: vira uma entrada em `falhas`, e quem
 monta o corpus decide o que fazer.
@@ -24,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 CONSULTAS: dict[str, dict[str, str]] = {
     "articles": {
-        "select": "id,title,summary,tags,published_at",
+        "select": "id,title,summary,tags,published_at,pdf_url",
         "order": "published_at.desc.nullslast",
         "limit": "2000",
     },
