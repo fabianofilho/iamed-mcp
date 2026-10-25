@@ -18,7 +18,7 @@ def test_env_file_nao_sobrescreve_o_modo_conector() -> None:
     assert _linhas("EnvironmentFile") == []
     ambiente = _linhas("Environment")
     assert "TRANSPORTE=streamable-http" in ambiente
-    assert "HTTP_HOSTS_PUBLICOS=debian-f.tailf42a96.ts.net" in ambiente
+    assert "HTTP_HOSTS_PUBLICOS=debian-f.tailf42a96.ts.net,mcp.iamed.cc" in ambiente
     assert "HTTP_PORTA=8107" in ambiente
 
 

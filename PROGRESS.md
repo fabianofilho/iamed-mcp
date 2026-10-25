@@ -9,7 +9,8 @@ IA.med (listar, buscar, abrir item), sem dado de usuário. Spec aprovado em
 - Servidor implementado, 117 testes, ruff e mypy strict limpos.
 - Testado local com a base real: MCP Inspector em stdio e HTTP; `claude mcp get`
   conectado. Detalhes em `docs/verificacao-local.md`.
-- No ar desde 17/10/2026: `https://debian-f.tailf42a96.ts.net/iamed/mcp`. Checkout em
+- No ar desde 17/10/2026; em `https://mcp.iamed.cc/iamed/mcp` desde 25/10/2026 (o Funnel
+  `debian-f.tailf42a96.ts.net` foi desligado nesse dia). Checkout em
   `~/iamed-mcp` do debian-f (main, cab9d54), `.env` 600, unit de usuário
   `iamed-connector` com o drop-in `50-sandbox.conf` dos outros conectores (o processo
   só enxerga `~/iamed-mcp`). Conferido: tools/list e buscar pela URL pública (200),
