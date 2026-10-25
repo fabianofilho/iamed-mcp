@@ -7,18 +7,20 @@ no Supabase com a chave anon. Nenhuma tool escreve, manda mensagem ou busca URL.
 
 from __future__ import annotations
 
+import base64
 import contextvars
 import json
 import logging
 import sys
 import time
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Annotated, Any, Literal, Protocol
 
 import pydantic_core
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
-from mcp.types import ToolAnnotations
+from mcp.types import Icon, ToolAnnotations
 from pydantic import Field
 
 from iamed_mcp.busca import Pagina
@@ -72,8 +74,21 @@ _NOME_DO_TIPO: dict[str, str] = {
     "content_relevance": "especialidades",
 }
 
+# Ícone do servidor e das tools, no molde da família (ecg-mcp): o robô do IA.med
+# com a cruz do IA.med no visor. Em data URI, e não URL: o cliente precisa ver o
+# ícone antes de autenticar, e o endereço do Funnel é um só para todos os servidores.
+ICONE = [
+    Icon(
+        src="data:image/svg+xml;base64,"
+        + base64.b64encode((Path(__file__).parent / "icone.svg").read_bytes()).decode(),
+        mimeType="image/svg+xml",
+        sizes=["any"],
+    )
+]
+
 mcp = MCPServer(
     "iamed-mcp",
+    icons=ICONE,
     version="0.1.0",
     instructions=(
         "Conteúdo publicado do IA.med (app.iamed.cc) sobre IA aplicada à medicina: artigos, "
@@ -206,7 +221,7 @@ def _registrar(tool: str, inicio: float, resultado: str, **campos: Any) -> None:
 TipoParam = Literal["artigo", "news", "episodio", "aula", "evento", "conferencias", "repo"]
 
 
-@mcp.tool(annotations=_SOMENTE_LEITURA)
+@mcp.tool(annotations=_SOMENTE_LEITURA, icons=ICONE)
 async def listar_recentes(
     tipos: Annotated[list[TipoParam] | None, Field(max_length=7)] = None,
     dias: Annotated[int, Field(ge=1, le=365)] = 14,
@@ -275,7 +290,7 @@ async def listar_recentes(
     return resposta
 
 
-@mcp.tool(annotations=_SOMENTE_LEITURA)
+@mcp.tool(annotations=_SOMENTE_LEITURA, icons=ICONE)
 async def buscar(
     tema: Annotated[str, Field(min_length=2, max_length=200)],
     tipos: Annotated[list[TipoParam] | None, Field(max_length=7)] = None,
@@ -333,7 +348,7 @@ async def buscar(
     return resposta
 
 
-@mcp.tool(annotations=_SOMENTE_LEITURA)
+@mcp.tool(annotations=_SOMENTE_LEITURA, icons=ICONE)
 async def abrir_item(id: Annotated[str, Field(min_length=1, max_length=64)]) -> RespostaItem:
     """Abre um item da base do IA.med pelo id (de listar_recentes ou buscar).
 
