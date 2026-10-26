@@ -101,10 +101,10 @@ def test_sem_host_publico_mantem_o_padrao_do_sdk() -> None:
 
 
 def test_host_publico_entra_sem_derrubar_o_loopback() -> None:
-    regras = _seguranca_de_transporte(_config(http_hosts_publicos=["debian-f.tailf42a96.ts.net"]))
+    regras = _seguranca_de_transporte(_config(http_hosts_publicos=["mcp.iamed.cc"]))
     assert regras is not None
     assert regras.enable_dns_rebinding_protection is True
-    assert "debian-f.tailf42a96.ts.net" in regras.allowed_hosts
+    assert "mcp.iamed.cc" in regras.allowed_hosts
     assert "127.0.0.1:*" in regras.allowed_hosts
 
 
@@ -112,9 +112,9 @@ def test_host_de_fora_da_lista_continua_recusado() -> None:
     from mcp.server.transport_security import TransportSecurityMiddleware
 
     guarda = TransportSecurityMiddleware(
-        _seguranca_de_transporte(_config(http_hosts_publicos=["debian-f.tailf42a96.ts.net"]))
+        _seguranca_de_transporte(_config(http_hosts_publicos=["mcp.iamed.cc"]))
     )
-    assert guarda._validate_host("debian-f.tailf42a96.ts.net") is True
+    assert guarda._validate_host("mcp.iamed.cc") is True
     assert guarda._validate_host("site-do-atacante.exemplo") is False
     assert guarda._validate_host(None) is False
 
