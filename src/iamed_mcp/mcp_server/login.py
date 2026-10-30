@@ -11,6 +11,16 @@ encaminha o prefixo de cada servidor (`/iamed/*`). A descoberta daria 404. Aqui 
 metadata fica dentro do prefixo e o `WWW-Authenticate` aponta para ele, que é o
 endereço que o cliente segue.
 
+**Por que o servidor de autorização anunciado pode ser este próprio servidor.** O
+Supabase atende pelo domínio da marca (auth.iamed.cc), mas o metadata dele declara
+o emissor e todos os endpoints no host supabase.co, e o projeto hospedado não deixa
+mudar o emissor. Com `auth_publica`, o metadata do recurso aponta para um emissor
+dentro do prefixo deste servidor (`https://host/iamed`), que serve o próprio
+metadata de servidor de autorização (RFC 8414) com os endpoints no domínio da
+marca. O token continua saindo com o `iss` do Supabase, conferido como antes. O
+caminho da RFC (`/.well-known/oauth-authorization-server/iamed`, na raiz do host)
+chega aqui por uma rota do Traefik da VPS; detalhe em mcps-suite, docs/LOGIN.md.
+
 **Por que o plano é lido com o token do próprio usuário.** A RLS do app só
 devolve a linha do próprio usuário em `profiles`, e o banco não deixa ninguém
 mudar o próprio plano. Com o token dele e a chave anon, o servidor lê o plano sem
@@ -48,6 +58,10 @@ logger = logging.getLogger(__name__)
 PLANOS = ("interno", "residente", "especialista", "doutor", "pos-doc")
 PAGINA_DE_PLANOS = "https://app.iamed.cc/planos"
 CAMINHO_METADATA = "/.well-known/oauth-protected-resource"
+CAMINHO_AUTORIZACAO = "/.well-known/oauth-authorization-server"
+# Sem "openid": o cliente não pede id_token, cujo `iss` (o do Supabase) não bate com
+# o emissor anunciado aqui. O Supabase aceita o authorize com e sem escopo.
+ESCOPOS = ["email", "profile", "phone", "offline_access"]
 FOLGA_SEGUNDOS = 30
 CACHE_PLANO_SEGUNDOS = 300
 
@@ -115,6 +129,7 @@ class LoginSupabase:
         caminho_mcp: str,
         plano_minimo: str = "residente",
         emissores: list[str] | None = None,
+        auth_publica: str | None = None,
         limite_por_usuario: int = 60,
         buscar_chave: Callable[[str], Any] | None = None,
         cliente: httpx.AsyncClient | None = None,
@@ -123,13 +138,19 @@ class LoginSupabase:
             raise ValueError(f"plano_minimo desconhecido: {plano_minimo}")
         if not recurso.endswith(caminho_mcp):
             raise ValueError("o recurso tem que terminar no caminho do MCP")
+        if auth_publica and not auth_publica.startswith("https://"):
+            raise ValueError("auth_publica tem que ser https (ex.: https://auth.iamed.cc)")
         self.supabase_url = supabase_url.rstrip("/")
         self.chave_anon = chave_anon
         self.recurso = recurso
         self.plano_minimo = plano_minimo
         self.emissores = emissores or [f"{self.supabase_url}/auth/v1"]
         # O metadata fica no mesmo prefixo do MCP: .../iamed/mcp -> .../iamed/.well-known/...
-        self.url_metadata = recurso[: -len(caminho_mcp)] + CAMINHO_METADATA
+        prefixo = recurso[: -len(caminho_mcp)]
+        self.url_metadata = prefixo + CAMINHO_METADATA
+        # Com o domínio da marca, o emissor anunciado é o próprio prefixo.
+        self.auth_publica = auth_publica.rstrip("/") if auth_publica else None
+        self.emissor_anunciado = prefixo if self.auth_publica else self.emissores[0]
         if buscar_chave is None:
             jwks = jwt.PyJWKClient(
                 f"{self.supabase_url}/auth/v1/.well-known/jwks.json", lifespan=3600
@@ -143,9 +164,31 @@ class LoginSupabase:
     def metadata(self) -> dict[str, Any]:
         return {
             "resource": self.recurso,
-            "authorization_servers": [self.emissores[0]],
+            "authorization_servers": [self.emissor_anunciado],
             "bearer_methods_supported": ["header"],
             "resource_documentation": PAGINA_DE_PLANOS,
+        }
+
+    def metadata_autorizacao(self) -> dict[str, Any]:
+        """Metadata de servidor de autorização com os endpoints no domínio da marca."""
+        auth = f"{self.auth_publica}/auth/v1"
+        return {
+            "issuer": self.emissor_anunciado,
+            "authorization_endpoint": f"{auth}/oauth/authorize",
+            "token_endpoint": f"{auth}/oauth/token",
+            "registration_endpoint": f"{auth}/oauth/clients/register",
+            "jwks_uri": f"{auth}/.well-known/jwks.json",
+            "scopes_supported": ESCOPOS,
+            "response_types_supported": ["code"],
+            "response_modes_supported": ["query"],
+            "grant_types_supported": ["authorization_code", "refresh_token"],
+            "token_endpoint_auth_methods_supported": [
+                "none",
+                "client_secret_basic",
+                "client_secret_post",
+            ],
+            "code_challenge_methods_supported": ["S256"],
+            "service_documentation": PAGINA_DE_PLANOS,
         }
 
     async def conferir(self, token: str) -> Usuario | Recusa:
@@ -222,6 +265,9 @@ class LoginSupabase:
                 return
             if scope.get("path") == CAMINHO_METADATA:
                 await _json(send, 200, self.metadata())
+                return
+            if self.auth_publica and scope.get("path") == CAMINHO_AUTORIZACAO:
+                await _json(send, 200, self.metadata_autorizacao())
                 return
             token = _token_do_cabecalho(scope)
             if token is None:
