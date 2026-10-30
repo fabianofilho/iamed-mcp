@@ -83,6 +83,10 @@ class Config(BaseSettings):
     # Emissores aceitos no `iss`. Vazio = <SUPABASE_URL>/auth/v1, que é o que a
     # descoberta OIDC do projeto anuncia. O primeiro vai no metadata do recurso.
     mcp_login_emissores: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    # Domínio próprio do Supabase (ex.: https://auth.iamed.cc). Preenchido, o login
+    # abre nele: este servidor anuncia a si mesmo como emissor e serve o metadata de
+    # servidor de autorização com os endpoints nesse domínio. Vazio = como antes.
+    mcp_login_auth_publica: str = Field(default="")
 
     @field_validator("mcp_login_emissores", mode="before")
     @classmethod

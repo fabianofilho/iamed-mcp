@@ -80,12 +80,21 @@ token do próprio usuário. Não há chave de serviço.
 | `MCP_LOGIN_PLANO_MINIMO` | `residente` por padrão |
 | `MCP_LOGIN_LIMITE_POR_USUARIO` | requisições por minuto por usuário, 60 por padrão |
 | `MCP_LOGIN_EMISSORES` | emissores aceitos no token, separados por vírgula; vazio é `SUPABASE_URL` + `/auth/v1` |
+| `MCP_LOGIN_AUTH_PUBLICA` | domínio próprio do Supabase, por exemplo `https://auth.iamed.cc`; vazio deixa o login no host supabase.co |
 
 Respostas: 401 sem token ou com token inválido, 403 sem o plano (com o link para
 a página de planos), 503 quando não dá para ler o plano. O metadata do recurso
 (RFC 9728) fica em `/.well-known/oauth-protected-resource` dentro do próprio
 prefixo, porque o Funnel não encaminha a raiz do host. Plano e riscos:
 `docs/LOGIN.md` na mcps-suite.
+
+Com `MCP_LOGIN_AUTH_PUBLICA`, o login abre no domínio da marca. O Supabase atende
+por `auth.iamed.cc`, mas o metadata dele declara tudo no host supabase.co e o
+projeto hospedado não deixa mudar o emissor. Então o servidor anuncia o próprio
+prefixo (`https://mcp.iamed.cc/iamed`) como emissor e serve em
+`/.well-known/oauth-authorization-server` o metadata de servidor de autorização
+(RFC 8414) com os endpoints em `auth.iamed.cc`. O caminho da RFC, na raiz do host,
+chega aqui por uma rota do Traefik da VPS. O token segue com o `iss` do Supabase.
 
 ## Desligar rápido
 

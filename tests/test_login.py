@@ -233,3 +233,40 @@ def test_config_divide_emissores(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setenv("MCP_LOGIN_EMISSORES", "https://a/auth/v1, https://b/auth/v1")
     assert Config(_env_file=None).mcp_login_emissores == ["https://a/auth/v1", "https://b/auth/v1"]
+
+
+# --- login no domínio da marca (auth_publica) ---
+
+AUTH = "https://auth.exemplo"
+
+
+def test_sem_auth_publica_nao_serve_metadata_de_autorizacao() -> None:
+    status, _, _, _ = _chamar(_login(), "/.well-known/oauth-authorization-server")
+    assert status == 401
+
+
+def test_auth_publica_anuncia_o_prefixo_como_emissor() -> None:
+    login = _login(auth_publica=AUTH + "/")
+    _, _, recurso, _ = _chamar(login, "/.well-known/oauth-protected-resource")
+    assert recurso["authorization_servers"] == ["https://host.exemplo/iamed"]
+    status, _, corpo, chegou = _chamar(login, "/.well-known/oauth-authorization-server")
+    assert status == 200 and chegou == []
+    # RFC 8414: o issuer é o endereço que o cliente usou para achar o metadata.
+    assert corpo["issuer"] == "https://host.exemplo/iamed"
+    assert corpo["authorization_endpoint"] == f"{AUTH}/auth/v1/oauth/authorize"
+    assert corpo["token_endpoint"] == f"{AUTH}/auth/v1/oauth/token"
+    assert corpo["registration_endpoint"] == f"{AUTH}/auth/v1/oauth/clients/register"
+    assert corpo["code_challenge_methods_supported"] == ["S256"]
+    assert "openid" not in corpo["scopes_supported"]
+
+
+@respx.mock
+def test_auth_publica_segue_aceitando_o_iss_do_supabase() -> None:
+    _perfil(respx.mock, plan_tier="residente", subscription_status="active")
+    status, _, _, chegou = _chamar(_login(auth_publica=AUTH), token=_token())
+    assert status == 200 and chegou == ["/mcp"]
+
+
+def test_auth_publica_tem_que_ser_https() -> None:
+    with pytest.raises(ValueError, match="https"):
+        _login(auth_publica="http://auth.exemplo")

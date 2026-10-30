@@ -536,6 +536,7 @@ def main() -> None:
             plano_minimo=config.mcp_login_plano_minimo,
             limite_por_usuario=config.mcp_login_limite_por_usuario,
             emissores=config.mcp_login_emissores or None,
+            auth_publica=config.mcp_login_auth_publica or None,
         )
         app_mcp = login.proteger(app_mcp)
         logger.info(
