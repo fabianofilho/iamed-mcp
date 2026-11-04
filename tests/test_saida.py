@@ -139,6 +139,7 @@ def test_link_externo_recusa_arquivo_do_app(url: str) -> None:
         ("https://doi.org/10.1001/jama.2026.1", False),
         ("https://notarxiv.org/abs/1", False),
         ("https://doi.org/10.1101/2026.01.01.123", True),
+        ("https://doi.org/10.64898/2026.10.23.26365968", True),
         ("https://doi.org/10.48550/arXiv.2510.1", True),
         (None, False),
     ],
