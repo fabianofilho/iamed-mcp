@@ -107,8 +107,16 @@ _HOSTS_PREPRINT = (
     "researchsquare.com",
     "preprints.org",
 )
-# Prefixos de DOI dos mesmos servidores (doi.org/10.1101/... é medRxiv/bioRxiv).
-_DOI_PREPRINT = ("10.1101/", "10.48550/", "10.2139/ssrn", "10.21203/rs", "10.20944/preprints")
+# Prefixos de DOI dos mesmos servidores (doi.org/10.1101/ e 10.64898/ são medRxiv/bioRxiv;
+# o 10.64898 é o prefixo novo, visto em outubro de 2026, e redireciona para medrxiv.org).
+_DOI_PREPRINT = (
+    "10.1101/",
+    "10.64898/",
+    "10.48550/",
+    "10.2139/ssrn",
+    "10.21203/rs",
+    "10.20944/preprints",
+)
 
 
 def e_preprint(url: str | None) -> bool:
